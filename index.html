@@ -3,54 +3,126 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cake Shop Pro</title>
+    <title>CakeShop | Premium Treats</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 100; }
-        .active { display: flex; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800">
+<body class="bg-gray-50">
 
-    <header class="bg-white p-4 shadow-sm flex justify-between items-center sticky top-0 z-50">
+    <nav class="bg-white p-4 shadow-sm sticky top-0 flex justify-between items-center z-50">
         <h1 class="text-2xl font-bold text-pink-500">🍰 CakeShop</h1>
-        <div class="flex gap-4">
-            <button onclick="toggleBag()" class="relative font-semibold">
-                🛒 Bag (<span id="bag-count">0</span>)
-            </button>
-            <button id="auth-btn" onclick="openLogin()" class="bg-pink-500 text-white px-4 py-2 rounded-lg text-sm">Login</button>
+        <div class="flex items-center gap-4">
+            <button onclick="toggleModal('cart-modal')" class="font-medium text-gray-700">Bag (<span id="cart-count">0</span>)</button>
+            <button id="user-btn" onclick="toggleModal('login-modal')" class="bg-pink-500 text-white px-4 py-2 rounded-lg">Login</button>
         </div>
-    </header>
+    </nav>
 
-    <div class="p-4 flex gap-2 overflow-x-auto bg-white border-b">
-        <button onclick="filterCakes('All')" class="px-4 py-1 border rounded-full whitespace-nowrap">All</button>
-        <button onclick="filterCakes('Wedding')" class="px-4 py-1 border rounded-full whitespace-nowrap">Wedding</button>
-        <button onclick="filterCakes('Birthday')" class="px-4 py-1 border rounded-full whitespace-nowrap">Birthday</button>
-    </div>
-
-    <main id="product-list" class="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-        </main>
-
-    <div id="bag-modal" class="modal">
-        <div class="bg-white p-6 rounded-xl w-11/12 max-w-md">
-            <h2 class="text-xl font-bold mb-4">Your Bag</h2>
-            <div id="bag-items" class="mb-4"></div>
-            <hr class="mb-4">
-            <button onclick="checkout()" class="w-full bg-green-500 text-white py-3 rounded-lg font-bold">Order Now (Get Recipe PDF)</button>
-            <button onclick="toggleBag()" class="w-full mt-2 text-gray-500">Close</button>
+    <main class="max-w-6xl mx-auto p-6">
+        <div class="flex gap-4 mb-8 overflow-x-auto pb-2">
+            <button onclick="loadProducts()" class="bg-white px-6 py-2 rounded-full shadow-sm hover:bg-pink-50">All</button>
+            <button onclick="loadProducts('Chocolate')" class="bg-white px-6 py-2 rounded-full shadow-sm hover:bg-pink-50">Chocolate</button>
+            <button onclick="loadProducts('Wedding')" class="bg-white px-6 py-2 rounded-full shadow-sm hover:bg-pink-50">Wedding</button>
         </div>
-    </div>
+
+        <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            </div>
+    </main>
 
     <div id="login-modal" class="modal">
-        <div class="bg-white p-8 rounded-xl w-11/12 max-w-sm">
-            <h2 class="text-2xl font-bold mb-4">Login</h2>
-            <input type="email" id="email" placeholder="Email" class="w-full border p-2 mb-2 rounded">
-            <input type="password" id="pass" placeholder="Password" class="w-full border p-2 mb-4 rounded">
-            <button onclick="performLogin()" class="w-full bg-pink-500 text-white py-2 rounded mb-2">Login</button>
-            <p class="text-xs text-center">New here? <a href="#" class="text-blue-500">Register</a></p>
+        <div class="bg-white p-8 rounded-2xl w-full max-w-sm mx-4">
+            <h2 class="text-2xl font-bold mb-4">Welcome Back</h2>
+            <input type="email" id="email" placeholder="Email" class="w-full border p-3 rounded-lg mb-3">
+            <input type="password" id="pass" placeholder="Password" class="w-full border p-3 rounded-lg mb-4">
+            <button onclick="handleLogin()" class="w-full bg-pink-500 text-white py-3 rounded-lg font-bold">Sign In</button>
+            <p class="text-center mt-4 text-sm">New here? <button class="text-pink-500 font-bold">Register</button></p>
+            <button onclick="toggleModal('login-modal')" class="w-full mt-2 text-gray-400 text-sm text-center">Cancel</button>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <div id="cart-modal" class="modal">
+        <div class="bg-white p-8 rounded-2xl w-full max-w-md mx-4">
+            <h2 class="text-2xl font-bold mb-4">Your Bag</h2>
+            <div id="cart-items" class="space-y-4 max-h-60 overflow-y-auto mb-4"></div>
+            <div class="border-t pt-4">
+                <div class="flex justify-between font-bold text-xl mb-4">
+                    <span>Total:</span> <span id="cart-total">$0</span>
+                </div>
+                <button onclick="placeOrder()" class="w-full bg-green-500 text-white py-4 rounded-xl font-bold text-lg">Confirm Order</button>
+            </div>
+            <button onclick="toggleModal('cart-modal')" class="w-full mt-4 text-gray-400">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // Supabase Config
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let cart = [];
+        let user = null;
+
+        function toggleModal(id) { document.getElementById(id).classList.toggle('active'); }
+
+        async function loadProducts(filter = null) {
+            let query = _supabase.from('products').select('*');
+            if(filter) query = query.eq('category', filter);
+            const { data } = await query;
+            
+            const grid = document.getElementById('product-grid');
+            grid.innerHTML = data.map(p => `
+                <div class="bg-white rounded-2xl shadow-sm border p-4 transition hover:shadow-lg">
+                    <img src="${p.image_url}" class="w-full h-48 object-cover rounded-xl">
+                    <h3 class="font-bold text-lg mt-4">${p.name}</h3>
+                    <p class="text-pink-600 font-bold">$${p.price}</p>
+                    <button onclick="addToCart(${p.id}, '${p.name}', ${p.price})" class="w-full mt-4 bg-gray-900 text-white py-2 rounded-lg text-sm">Add to Bag</button>
+                </div>
+            `).join('');
+        }
+
+        function addToCart(id, name, price) {
+            cart.push({id, name, price});
+            updateCartUI();
+        }
+
+        function updateCartUI() {
+            document.getElementById('cart-count').innerText = cart.length;
+            const itemsDiv = document.getElementById('cart-items');
+            const total = cart.reduce((sum, item) => sum + item.price, 0);
+            itemsDiv.innerHTML = cart.map(item => `<div class="flex justify-between"><span>${item.name}</span><b>$${item.price}</b></div>`).join('');
+            document.getElementById('cart-total').innerText = `$${total}`;
+        }
+
+        async function handleLogin() {
+            // Simplified Login for Demo
+            user = { email: document.getElementById('email').value };
+            document.getElementById('user-btn').innerText = "Account";
+            toggleModal('login-modal');
+        }
+
+        async function placeOrder() {
+            if(!user) return toggleModal('login-modal');
+            const { error } = await _supabase.from('orders').insert([{
+                customer_name: user.email,
+                items: cart,
+                total: cart.reduce((sum, i) => sum + i.price, 0),
+                status: 'Baking'
+            }]);
+            
+            if(!error) {
+                alert("Order Placed! Your Recipe PDF is downloading...");
+                window.location.href = "recipe.pdf"; // Place this file in your GitHub repo
+                cart = [];
+                updateCartUI();
+                toggleModal('cart-modal');
+            }
+        }
+
+        loadProducts();
+    </script>
 </body>
 </html>
