@@ -1,10 +1,12 @@
-// Supabase Configuration
+// Supabase Configuration - REPLACE WITH YOUR ACTUAL CREDENTIALS
 const SUPABASE_URL = 'https://ivvppceuqblhhbqnyfjp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2dnBwY2V1cWJsaGhicW55ZmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTc3ODgsImV4cCI6MjA4Mzk5Mzc4OH0.iM48uGRMQjOVGKqqV7Z3mPGFH4BkWEnZS6T-Zw0dcPs';
 
+
+// Initialize Supabase client
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// State
+// State Management
 let currentUser = null;
 let shoppingBag = JSON.parse(localStorage.getItem('shoppingBag')) || [];
 let products = [];
@@ -76,31 +78,42 @@ const elements = {
     
     // Other
     searchInput: document.getElementById('searchInput'),
-    categoryBtns: document.querySelectorAll('.categoryBtn'),
+    categoryBtns: document.querySelectorAll('.category-btn'),
     productsGrid: document.getElementById('productsGrid'),
     ordersList: document.getElementById('ordersList')
 };
 
-// Initialize
+// Initialize the application
 document.addEventListener('DOMContentLoaded', async () => {
-    initEventListeners();
-    await checkAuth();
-    await loadProducts();
-    updateBagUI();
-    
-    // Check if user is banned
-    if (currentUser) {
-        await checkIfBanned();
+    try {
+        await initializeApp();
+    } catch (error) {
+        console.error('Error initializing app:', error);
+        showNotification('Error loading application. Please refresh the page.', 'error');
     }
 });
 
-// Event Listeners
-function initEventListeners() {
-    // Bag
-    elements.bagBtn.addEventListener('click', () => showModal(elements.bagModal));
+async function initializeApp() {
+    setupEventListeners();
+    await checkAuthStatus();
+    await loadProducts();
+    updateBagUI();
+    
+    // Set up real-time subscription for order updates
+    setupRealtimeSubscriptions();
+}
+
+// Event Listeners Setup
+function setupEventListeners() {
+    // Shopping bag
+    elements.bagBtn.addEventListener('click', () => {
+        updateBagUI();
+        showModal(elements.bagModal);
+    });
+    
     elements.closeBag.addEventListener('click', () => hideModal(elements.bagModal));
     
-    // Product Modal
+    // Product modal
     elements.closeModal.addEventListener('click', () => hideModal(elements.productModal));
     
     // Quantity controls
@@ -120,7 +133,7 @@ function initEventListeners() {
     // Checkout
     elements.checkoutBtn.addEventListener('click', () => {
         if (shoppingBag.length === 0) {
-            alert('Your bag is empty!');
+            showNotification('Your bag is empty!', 'warning');
             return;
         }
         
@@ -138,112 +151,127 @@ function initEventListeners() {
     elements.closeOrderModal.addEventListener('click', () => hideModal(elements.orderModal));
     
     // Order form
-    elements.orderForm.addEventListener('submit', placeOrder);
+    elements.orderForm.addEventListener('submit', handleOrderSubmit);
     
-    // Auth
+    // Authentication
     elements.loginBtn.addEventListener('click', showAuthModal);
-    elements.logoutBtn.addEventListener('click', logout);
+    elements.logoutBtn.addEventListener('click', handleLogout);
     elements.closeAuthModal.addEventListener('click', () => hideModal(elements.authModal));
+    
     elements.switchToRegister.addEventListener('click', () => {
         elements.loginForm.classList.add('hidden');
         elements.registerForm.classList.remove('hidden');
         elements.authTitle.textContent = 'Register';
     });
+    
     elements.switchToLogin.addEventListener('click', () => {
         elements.registerForm.classList.add('hidden');
         elements.loginForm.classList.remove('hidden');
         elements.authTitle.textContent = 'Login';
     });
-    elements.loginSubmit.addEventListener('click', login);
-    elements.registerSubmit.addEventListener('click', register);
+    
+    elements.loginSubmit.addEventListener('click', handleLogin);
+    elements.registerSubmit.addEventListener('click', handleRegister);
     
     // Search and filter
     elements.searchInput.addEventListener('input', filterProducts);
+    
     elements.categoryBtns.forEach(btn => {
         btn.addEventListener('click', () => {
+            // Update active button styling
             elements.categoryBtns.forEach(b => {
                 b.classList.remove('bg-pink-600', 'text-white');
                 b.classList.add('bg-pink-100', 'text-pink-700');
             });
             btn.classList.remove('bg-pink-100', 'text-pink-700');
             btn.classList.add('bg-pink-600', 'text-white');
+            
             filterProducts();
         });
     });
 }
 
-// Modal functions
-function showModal(modal) {
-    modal.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-}
-
-function hideModal(modal) {
-    modal.classList.add('hidden');
-    document.body.style.overflow = 'auto';
-}
-
-// Authentication
-async function checkAuth() {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (session) {
-        currentUser = session.user;
-        await updateUserProfile();
-        await loadUserOrders();
+// Authentication Functions
+async function checkAuthStatus() {
+    try {
+        const { data: { session }, error } = await supabase.auth.getSession();
         
-        // Check if admin
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('is_admin')
-            .eq('id', currentUser.id)
-            .single();
-            
-        if (profile?.is_admin && currentUser.email === 'admin@cakeshop.com') {
-            window.location.href = 'admin.html';
+        if (error) {
+            console.error('Session error:', error);
             return;
         }
         
-        elements.authSection.classList.remove('hidden');
-        elements.guestSection.classList.add('hidden');
-        
-        // Pre-fill order form
-        elements.customerName.value = currentUser.user_metadata?.full_name || '';
-        elements.customerEmail.value = currentUser.email || '';
+        if (session) {
+            currentUser = session.user;
+            await handleUserSession(session.user);
+        } else {
+            showGuestView();
+        }
+    } catch (error) {
+        console.error('Auth check error:', error);
     }
 }
 
-async function updateUserProfile() {
-    const { data: profile } = await supabase
+async function handleUserSession(user) {
+    // Check if user is banned
+    const { data: profile, error } = await supabase
         .from('profiles')
-        .select('*')
-        .eq('id', currentUser.id)
+        .select('is_banned, is_admin')
+        .eq('id', user.id)
         .single();
     
-    if (!profile) {
-        // Create profile if doesn't exist
-        await supabase.from('profiles').insert({
-            id: currentUser.id,
-            email: currentUser.email,
-            full_name: currentUser.user_metadata?.full_name || '',
-            is_admin: currentUser.email === 'admin@cakeshop.com'
-        });
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        console.error('Profile fetch error:', error);
     }
-}
-
-async function checkIfBanned() {
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_banned')
-        .eq('id', currentUser.id)
-        .single();
     
     if (profile?.is_banned) {
         await supabase.auth.signOut();
-        currentUser = null;
-        alert('Your account has been suspended. Please contact support.');
+        showNotification('Your account has been suspended.', 'error');
         window.location.reload();
+        return;
     }
+    
+    // Create profile if doesn't exist
+    if (!profile) {
+        await supabase.from('profiles').insert({
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || '',
+            is_admin: user.email === 'admin@cakeshop.com'
+        });
+    }
+    
+    // Redirect admin to admin dashboard
+    if (user.email === 'admin@cakeshop.com' && window.location.pathname.includes('index.html')) {
+        window.location.href = 'admin.html';
+        return;
+    }
+    
+    // Show authenticated view
+    showAuthenticatedView();
+    
+    // Load user orders
+    await loadUserOrders();
+    
+    // Pre-fill order form with user info
+    if (profile?.full_name) {
+        elements.customerName.value = profile.full_name;
+    } else if (user.user_metadata?.full_name) {
+        elements.customerName.value = user.user_metadata.full_name;
+    }
+    elements.customerEmail.value = user.email || '';
+}
+
+function showAuthenticatedView() {
+    elements.authSection.classList.remove('hidden');
+    elements.guestSection.classList.add('hidden');
+    elements.ordersList.innerHTML = '<p class="text-gray-500 text-center py-4">Loading orders...</p>';
+}
+
+function showGuestView() {
+    elements.authSection.classList.add('hidden');
+    elements.guestSection.classList.remove('hidden');
+    elements.ordersList.innerHTML = '<p class="text-gray-500 text-center py-4">Please login to view your orders</p>';
 }
 
 function showAuthModal() {
@@ -254,53 +282,72 @@ function showAuthModal() {
     showModal(elements.authModal);
 }
 
-async function login() {
-    const email = elements.loginEmail.value;
+async function handleLogin() {
+    const email = elements.loginEmail.value.trim();
     const password = elements.loginPassword.value;
     
-    const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-    });
-    
-    if (error) {
-        showAuthMessage(error.message, 'error');
+    if (!email || !password) {
+        showAuthMessage('Please fill in all fields', 'error');
         return;
     }
     
-    hideModal(elements.authModal);
-    window.location.reload();
+    try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password
+        });
+        
+        if (error) throw error;
+        
+        showNotification('Login successful!', 'success');
+        hideModal(elements.authModal);
+        window.location.reload();
+    } catch (error) {
+        showAuthMessage(error.message, 'error');
+    }
 }
 
-async function register() {
-    const name = elements.registerName.value;
-    const email = elements.registerEmail.value;
+async function handleRegister() {
+    const name = elements.registerName.value.trim();
+    const email = elements.registerEmail.value.trim();
     const password = elements.registerPassword.value;
     
-    const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-            data: {
-                full_name: name
-            }
-        }
-    });
-    
-    if (error) {
-        showAuthMessage(error.message, 'error');
+    if (!name || !email || !password) {
+        showAuthMessage('Please fill in all fields', 'error');
         return;
     }
     
-    showAuthMessage('Registration successful! Please check your email to confirm your account.', 'success');
+    if (password.length < 6) {
+        showAuthMessage('Password must be at least 6 characters', 'error');
+        return;
+    }
     
-    // Switch to login form after 2 seconds
-    setTimeout(() => {
-        elements.registerForm.classList.add('hidden');
-        elements.loginForm.classList.remove('hidden');
-        elements.authTitle.textContent = 'Login';
-        elements.loginEmail.value = email;
-    }, 2000);
+    try {
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    full_name: name
+                }
+            }
+        });
+        
+        if (error) throw error;
+        
+        showAuthMessage('Registration successful! Please check your email to confirm your account.', 'success');
+        
+        // Switch to login form
+        setTimeout(() => {
+            elements.registerForm.classList.add('hidden');
+            elements.loginForm.classList.remove('hidden');
+            elements.authTitle.textContent = 'Login';
+            elements.loginEmail.value = email;
+            elements.loginPassword.value = '';
+        }, 3000);
+    } catch (error) {
+        showAuthMessage(error.message, 'error');
+    }
 }
 
 function showAuthMessage(message, type) {
@@ -309,50 +356,71 @@ function showAuthMessage(message, type) {
     elements.authMessage.classList.remove('hidden');
 }
 
-async function logout() {
-    await supabase.auth.signOut();
-    currentUser = null;
-    window.location.reload();
+async function handleLogout() {
+    try {
+        await supabase.auth.signOut();
+        currentUser = null;
+        shoppingBag = [];
+        localStorage.removeItem('shoppingBag');
+        showNotification('Logged out successfully', 'success');
+        window.location.reload();
+    } catch (error) {
+        console.error('Logout error:', error);
+        showNotification('Error logging out', 'error');
+    }
 }
 
-// Products
+// Product Functions
 async function loadProducts() {
-    const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-    
-    if (error) {
+    try {
+        const { data, error } = await supabase
+            .from('products')
+            .select('*')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        products = data || [];
+        renderProducts(products);
+    } catch (error) {
         console.error('Error loading products:', error);
+        showNotification('Error loading products', 'error');
+    }
+}
+
+function renderProducts(productsList) {
+    elements.productsGrid.innerHTML = '';
+    
+    if (productsList.length === 0) {
+        elements.productsGrid.innerHTML = `
+            <div class="col-span-full text-center py-8">
+                <p class="text-gray-500">No products found</p>
+            </div>
+        `;
         return;
     }
     
-    products = data;
-    renderProducts(products);
-}
-
-function renderProducts(productsToRender) {
-    elements.productsGrid.innerHTML = '';
-    
-    productsToRender.forEach(product => {
+    productsList.forEach(product => {
         const productCard = document.createElement('div');
-        productCard.className = 'bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition duration-300';
+        productCard.className = 'bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition duration-300 transform hover:-translate-y-1';
         productCard.innerHTML = `
-            <img src="${product.image_url || 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'}" 
-                 alt="${product.name}" 
-                 class="w-full h-48 object-cover">
+            <div class="relative overflow-hidden">
+                <img src="${product.image_url || 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'}" 
+                     alt="${product.name}" 
+                     class="w-full h-48 object-cover hover:scale-105 transition duration-300">
+            </div>
             <div class="p-4">
                 <div class="flex justify-between items-start mb-2">
-                    <h3 class="font-bold text-lg">${product.name}</h3>
-                    <span class="text-pink-600 font-bold">$${product.price}</span>
+                    <h3 class="font-bold text-lg text-gray-800">${product.name}</h3>
+                    <span class="text-pink-600 font-bold text-lg">$${product.price}</span>
                 </div>
-                <p class="text-gray-600 text-sm mb-3">${product.description?.substring(0, 80)}...</p>
+                <p class="text-gray-600 text-sm mb-3 line-clamp-2">${product.description || 'No description available.'}</p>
                 <div class="flex justify-between items-center">
-                    <span class="inline-block bg-pink-100 text-pink-800 text-xs px-2 py-1 rounded">
+                    <span class="inline-block bg-pink-100 text-pink-800 text-xs px-3 py-1 rounded-full font-medium">
                         ${product.category}
                     </span>
-                    <button class="view-product-btn bg-pink-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-700"
+                    <button class="view-product-btn bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition duration-300"
                             data-id="${product.id}">
                         View Details
                     </button>
@@ -379,6 +447,7 @@ function showProductDetails(product) {
     currentProduct = product;
     elements.modalProductName.textContent = product.name;
     elements.modalProductImage.src = product.image_url || 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80';
+    elements.modalProductImage.alt = product.name;
     elements.modalProductDescription.textContent = product.description || 'No description available.';
     elements.modalProductPrice.textContent = `$${product.price}`;
     elements.modalProductCategory.textContent = product.category;
@@ -402,53 +471,61 @@ function filterProducts() {
     if (searchTerm) {
         filtered = filtered.filter(p => 
             p.name.toLowerCase().includes(searchTerm) || 
-            p.description.toLowerCase().includes(searchTerm)
+            (p.description && p.description.toLowerCase().includes(searchTerm))
         );
     }
     
     renderProducts(filtered);
 }
 
-// Shopping Bag
+// Shopping Bag Functions
 function addToBag() {
     if (!currentProduct) return;
     
     const quantity = parseInt(elements.productQty.value);
-    const existingItem = shoppingBag.find(item => item.id === currentProduct.id);
+    const existingItemIndex = shoppingBag.findIndex(item => item.id === currentProduct.id);
     
-    if (existingItem) {
-        existingItem.quantity += quantity;
+    if (existingItemIndex !== -1) {
+        shoppingBag[existingItemIndex].quantity += quantity;
     } else {
         shoppingBag.push({
-            ...currentProduct,
+            id: currentProduct.id,
+            name: currentProduct.name,
+            price: currentProduct.price,
+            image_url: currentProduct.image_url,
             quantity: quantity
         });
     }
     
-    saveBag();
+    saveBagToStorage();
     updateBagUI();
     hideModal(elements.productModal);
     
-    // Show confirmation
-    alert(`${quantity} ${currentProduct.name}(s) added to bag!`);
+    showNotification(`${quantity} ${currentProduct.name}(s) added to bag!`, 'success');
 }
 
 function removeFromBag(productId) {
     shoppingBag = shoppingBag.filter(item => item.id !== productId);
-    saveBag();
+    saveBagToStorage();
     updateBagUI();
 }
 
 function updateBagUI() {
-    // Update count
+    // Update bag count
     const totalItems = shoppingBag.reduce((sum, item) => sum + item.quantity, 0);
     elements.bagCount.textContent = totalItems;
     
-    // Update bag modal
+    // Update bag modal content
     elements.bagItems.innerHTML = '';
     
     if (shoppingBag.length === 0) {
-        elements.bagItems.innerHTML = '<p class="text-gray-500 text-center py-8">Your bag is empty</p>';
+        elements.bagItems.innerHTML = `
+            <div class="text-center py-12">
+                <i class="fas fa-shopping-bag text-4xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500">Your bag is empty</p>
+                <p class="text-gray-400 text-sm mt-2">Add some delicious cakes!</p>
+            </div>
+        `;
         elements.bagTotal.textContent = '$0.00';
         return;
     }
@@ -460,145 +537,24 @@ function updateBagUI() {
         total += itemTotal;
         
         const itemElement = document.createElement('div');
-        itemElement.className = 'flex items-center border-b py-4';
+        itemElement.className = 'flex items-center border-b py-4 last:border-0';
         itemElement.innerHTML = `
+            <div class="flex-shrink-0 w-16 h-16 mr-4">
+                <img src="${item.image_url || 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80'}" 
+                     alt="${item.name}" 
+                     class="w-full h-full object-cover rounded">
+            </div>
             <div class="flex-1">
-                <h4 class="font-semibold">${item.name}</h4>
+                <h4 class="font-semibold text-gray-800">${item.name}</h4>
                 <p class="text-gray-600 text-sm">$${item.price} × ${item.quantity}</p>
             </div>
             <div class="text-right">
-                <div class="font-semibold">$${itemTotal.toFixed(2)}</div>
-                <button class="remove-item-btn text-red-500 text-sm mt-1" data-id="${item.id}">
-                    Remove
+                <div class="font-semibold text-lg">$${itemTotal.toFixed(2)}</div>
+                <button class="remove-item-btn text-red-500 hover:text-red-700 text-sm mt-1 transition duration-300"
+                        data-id="${item.id}">
+                    <i class="fas fa-trash mr-1"></i>Remove
                 </button>
             </div>
         `;
         
-        elements.bagItems.appendChild(itemElement);
-    });
-    
-    elements.bagTotal.textContent = `$${total.toFixed(2)}`;
-    
-    // Add event listeners to remove buttons
-    document.querySelectorAll('.remove-item-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const productId = e.target.dataset.id;
-            removeFromBag(productId);
-        });
-    });
-}
-
-function saveBag() {
-    localStorage.setItem('shoppingBag', JSON.stringify(shoppingBag));
-}
-
-function showOrderModal() {
-    // Update order summary
-    let summaryHTML = '';
-    let total = 0;
-    
-    shoppingBag.forEach(item => {
-        const itemTotal = item.price * item.quantity;
-        total += itemTotal;
-        summaryHTML += `
-            <div class="flex justify-between text-sm mb-1">
-                <span>${item.name} × ${item.quantity}</span>
-                <span>$${itemTotal.toFixed(2)}</span>
-            </div>
-        `;
-    });
-    
-    elements.orderSummary.innerHTML = summaryHTML;
-    elements.orderTotal.textContent = `$${total.toFixed(2)}`;
-    
-    // Set minimum delivery date to tomorrow
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    elements.deliveryDate.min = tomorrow.toISOString().split('T')[0];
-    
-    showModal(elements.orderModal);
-}
-
-// Orders
-async function placeOrder(e) {
-    e.preventDefault();
-    
-    if (!currentUser) {
-        alert('Please login to place an order');
-        return;
-    }
-    
-    if (shoppingBag.length === 0) {
-        alert('Your bag is empty!');
-        return;
-    }
-    
-    const orderData = {
-        user_id: currentUser.id,
-        customer_name: elements.customerName.value,
-        customer_email: elements.customerEmail.value,
-        customer_phone: elements.customerPhone.value,
-        delivery_address: elements.deliveryAddress.value,
-        items: shoppingBag,
-        total_amount: shoppingBag.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-        notes: elements.orderNotes.value,
-        status: 'pending'
-    };
-    
-    const { data, error } = await supabase
-        .from('orders')
-        .insert([orderData])
-        .select();
-    
-    if (error) {
-        console.error('Error placing order:', error);
-        alert('Error placing order. Please try again.');
-        return;
-    }
-    
-    // Clear shopping bag
-    shoppingBag = [];
-    saveBag();
-    updateBagUI();
-    
-    // Trigger recipe download
-    triggerRecipeDownload();
-    
-    // Show success message
-    hideModal(elements.orderModal);
-    alert('Order placed successfully! Your recipe is downloading...');
-    
-    // Reload orders
-    await loadUserOrders();
-}
-
-function triggerRecipeDownload() {
-    // Create a temporary link to trigger download
-    const link = document.createElement('a');
-    link.href = 'recipe.pdf';
-    link.download = 'sweet-dreams-recipe.pdf';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-async function loadUserOrders() {
-    if (!currentUser) {
-        elements.ordersList.innerHTML = '<p class="text-gray-500 text-center">Please login to view your orders</p>';
-        return;
-    }
-    
-    const { data: orders, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false });
-    
-    if (error) {
-        console.error('Error loading orders:', error);
-        elements.ordersList.innerHTML = '<p class="text-red-500 text-center">Error loading orders</p>';
-        return;
-    }
-    
-    if (orders.length === 0) {
-        elements.orde
+        elements.
