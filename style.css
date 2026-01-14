@@ -1,0 +1,74 @@
+// app.js
+
+// 1. Demo Data
+const products = [
+    { id: 1, name: "Dark Forest", price: 35, category: "Birthday", img: "https://placehold.co/400x400?text=Dark+Forest" },
+    { id: 2, name: "Wedding Lily", price: 150, category: "Wedding", img: "https://placehold.co/400x400?text=Wedding+Lily" },
+];
+
+let bag = [];
+let isLoggedIn = false;
+
+// 2. Render Products
+function renderProducts(filter = 'All') {
+    const list = document.getElementById('product-list');
+    list.innerHTML = '';
+    const filtered = filter === 'All' ? products : products.filter(p => p.category === filter);
+    
+    filtered.forEach(p => {
+        list.innerHTML += `
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                <img src="${p.img}" class="w-full h-40 object-cover">
+                <div class="p-3">
+                    <h3 class="font-bold">${p.name}</h3>
+                    <p class="text-pink-600 font-bold">$${p.price}</p>
+                    <button onclick="addToBag(${p.id})" class="mt-2 w-full bg-gray-100 py-1 rounded text-sm">Add to Bag</button>
+                </div>
+            </div>
+        `;
+    });
+}
+
+// 3. Bag Logic
+function addToBag(id) {
+    const item = products.find(p => p.id === id);
+    bag.push(item);
+    document.getElementById('bag-count').innerText = bag.length;
+    alert(`${item.name} added!`);
+}
+
+function toggleBag() {
+    document.getElementById('bag-modal').classList.toggle('active');
+    const itemsDiv = document.getElementById('bag-items');
+    itemsDiv.innerHTML = bag.map(item => `<div class="flex justify-between"><span>${item.name}</span><span>$${item.price}</span></div>`).join('');
+}
+
+// 4. Auth Logic
+function openLogin() {
+    document.getElementById('login-modal').classList.add('active');
+}
+
+function performLogin() {
+    isLoggedIn = true;
+    document.getElementById('auth-btn').innerText = "Account";
+    document.getElementById('login-modal').classList.remove('active');
+    alert("Logged in successfully!");
+}
+
+// 5. Checkout & PDF Logic
+function checkout() {
+    if(!isLoggedIn) {
+        alert("Please login first!");
+        openLogin();
+        return;
+    }
+    
+    // Simulate Order placement to Formspree
+    alert("Order Placed! Your Recipe PDF is downloading...");
+    
+    // Trigger PDF Download (Assuming file is in your GitHub repo)
+    window.location.href = "assets/recipe-guide.pdf";
+}
+
+// Initialize
+renderProducts();
