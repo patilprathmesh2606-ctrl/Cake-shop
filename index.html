@@ -3,126 +3,350 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CakeShop | Premium Treats</title>
+    <title>Sweet Dreams Cake Shop</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <style>
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; }
-        .modal.active { display: flex; }
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Dancing+Script:wght@400;500;600;700&display=swap');
+        * {
+            font-family: 'Poppins', sans-serif;
+        }
+        .logo {
+            font-family: 'Dancing Script', cursive;
+        }
     </style>
 </head>
-<body class="bg-gray-50">
-
-    <nav class="bg-white p-4 shadow-sm sticky top-0 flex justify-between items-center z-50">
-        <h1 class="text-2xl font-bold text-pink-500">🍰 CakeShop</h1>
-        <div class="flex items-center gap-4">
-            <button onclick="toggleModal('cart-modal')" class="font-medium text-gray-700">Bag (<span id="cart-count">0</span>)</button>
-            <button id="user-btn" onclick="toggleModal('login-modal')" class="bg-pink-500 text-white px-4 py-2 rounded-lg">Login</button>
+<body class="bg-pink-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <a href="#" class="logo text-3xl font-bold text-pink-600">Sweet Dreams</a>
+                
+                <div class="hidden md:flex space-x-6">
+                    <a href="#products" class="text-gray-700 hover:text-pink-600">Cakes</a>
+                    <a href="#about" class="text-gray-700 hover:text-pink-600">About</a>
+                    <a href="#orders" class="text-gray-700 hover:text-pink-600">My Orders</a>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- Shopping Bag -->
+                    <button id="bagBtn" class="relative text-gray-700 hover:text-pink-600">
+                        <i class="fas fa-shopping-bag text-xl"></i>
+                        <span id="bagCount" class="absolute -top-2 -right-2 bg-pink-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">0</span>
+                    </button>
+                    
+                    <!-- User/Auth -->
+                    <div id="authSection" class="hidden">
+                        <button id="logoutBtn" class="bg-pink-600 text-white px-4 py-2 rounded-full hover:bg-pink-700">
+                            Logout
+                        </button>
+                    </div>
+                    <div id="guestSection">
+                        <button id="loginBtn" class="text-pink-600 border border-pink-600 px-4 py-2 rounded-full hover:bg-pink-50">
+                            Login
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </nav>
 
-    <main class="max-w-6xl mx-auto p-6">
-        <div class="flex gap-4 mb-8 overflow-x-auto pb-2">
-            <button onclick="loadProducts()" class="bg-white px-6 py-2 rounded-full shadow-sm hover:bg-pink-50">All</button>
-            <button onclick="loadProducts('Chocolate')" class="bg-white px-6 py-2 rounded-full shadow-sm hover:bg-pink-50">Chocolate</button>
-            <button onclick="loadProducts('Wedding')" class="bg-white px-6 py-2 rounded-full shadow-sm hover:bg-pink-50">Wedding</button>
+    <!-- Hero Section -->
+    <section class="bg-gradient-to-r from-pink-100 to-pink-200 py-16">
+        <div class="container mx-auto px-4 text-center">
+            <h1 class="text-5xl md:text-6xl logo font-bold text-pink-700 mb-4">Sweet Dreams Cake Shop</h1>
+            <p class="text-xl text-gray-600 mb-8">Where every slice tells a sweet story</p>
+            <a href="#products" class="bg-pink-600 text-white px-8 py-3 rounded-full text-lg font-semibold hover:bg-pink-700 transition duration-300">
+                Order Now
+            </a>
         </div>
+    </section>
 
-        <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <!-- Search and Filter -->
+    <section class="container mx-auto px-4 py-8">
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-8">
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="flex-1">
+                    <input type="text" id="searchInput" placeholder="Search for your favorite cake..." 
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent">
+                </div>
+                <div class="flex gap-2 overflow-x-auto pb-2 md:pb-0">
+                    <button class="category-btn px-4 py-2 rounded-full bg-pink-600 text-white whitespace-nowrap" data-category="all">All Cakes</button>
+                    <button class="category-btn px-4 py-2 rounded-full bg-pink-100 text-pink-700 whitespace-nowrap hover:bg-pink-200" data-category="Chocolate">Chocolate</button>
+                    <button class="category-btn px-4 py-2 rounded-full bg-pink-100 text-pink-700 whitespace-nowrap hover:bg-pink-200" data-category="Wedding">Wedding</button>
+                    <button class="category-btn px-4 py-2 rounded-full bg-pink-100 text-pink-700 whitespace-nowrap hover:bg-pink-200" data-category="Birthday">Birthday</button>
+                    <button class="category-btn px-4 py-2 rounded-full bg-pink-100 text-pink-700 whitespace-nowrap hover:bg-pink-200" data-category="Special">Special</button>
+                </div>
             </div>
-    </main>
+        </div>
+    </section>
 
-    <div id="login-modal" class="modal">
-        <div class="bg-white p-8 rounded-2xl w-full max-w-sm mx-4">
-            <h2 class="text-2xl font-bold mb-4">Welcome Back</h2>
-            <input type="email" id="email" placeholder="Email" class="w-full border p-3 rounded-lg mb-3">
-            <input type="password" id="pass" placeholder="Password" class="w-full border p-3 rounded-lg mb-4">
-            <button onclick="handleLogin()" class="w-full bg-pink-500 text-white py-3 rounded-lg font-bold">Sign In</button>
-            <p class="text-center mt-4 text-sm">New here? <button class="text-pink-500 font-bold">Register</button></p>
-            <button onclick="toggleModal('login-modal')" class="w-full mt-2 text-gray-400 text-sm text-center">Cancel</button>
+    <!-- Products Grid -->
+    <section id="products" class="container mx-auto px-4 py-8">
+        <h2 class="text-3xl font-bold text-gray-800 mb-8 text-center">Our Delicious Cakes</h2>
+        <div id="productsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            <!-- Products will be loaded here -->
+        </div>
+    </section>
+
+    <!-- My Orders Section -->
+    <section id="orders" class="container mx-auto px-4 py-8">
+        <h2 class="text-3xl font-bold text-gray-800 mb-8 text-center">My Orders</h2>
+        <div id="ordersList" class="bg-white rounded-2xl shadow-lg p-6">
+            <p class="text-gray-500 text-center">Please login to view your orders</p>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="bg-pink-100 py-16">
+        <div class="container mx-auto px-4">
+            <div class="max-w-3xl mx-auto text-center">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6">About Sweet Dreams</h2>
+                <p class="text-gray-600 text-lg mb-6">
+                    Since 2010, we've been crafting beautiful and delicious cakes for all occasions. 
+                    Our master bakers use only the finest ingredients to create unforgettable desserts.
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <i class="fas fa-heart text-pink-500 text-3xl mb-4"></i>
+                        <h3 class="font-bold text-xl mb-2">Made with Love</h3>
+                        <p class="text-gray-600">Every cake is baked with passion and attention to detail</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <i class="fas fa-leaf text-pink-500 text-3xl mb-4"></i>
+                        <h3 class="font-bold text-xl mb-2">Fresh Ingredients</h3>
+                        <p class="text-gray-600">We source only the best quality ingredients daily</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <i class="fas fa-truck text-pink-500 text-3xl mb-4"></i>
+                        <h3 class="font-bold text-xl mb-2">Free Delivery</h3>
+                        <p class="text-gray-600">Free delivery on orders over $50 within city limits</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <h3 class="logo text-2xl font-bold text-pink-400">Sweet Dreams</h3>
+                    <p class="text-gray-400">© 2024 All rights reserved</p>
+                </div>
+                <div class="flex space-x-6">
+                    <a href="#" class="text-gray-400 hover:text-white"><i class="fab fa-facebook text-xl"></i></a>
+                    <a href="#" class="text-gray-400 hover:text-white"><i class="fab fa-instagram text-xl"></i></a>
+                    <a href="#" class="text-gray-400 hover:text-white"><i class="fab fa-twitter text-xl"></i></a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Product Detail Modal -->
+    <div id="productModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+        <div class="container mx-auto p-4 min-h-screen flex items-center">
+            <div class="bg-white rounded-2xl w-full max-w-4xl mx-auto my-8">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-2xl font-bold text-gray-800" id="modalProductName"></h3>
+                        <button id="closeModal" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <img id="modalProductImage" src="" alt="" class="w-full h-64 md:h-96 object-cover rounded-xl">
+                        </div>
+                        <div>
+                            <p class="text-gray-600 mb-4" id="modalProductDescription"></p>
+                            <div class="text-3xl font-bold text-pink-600 mb-6" id="modalProductPrice"></div>
+                            <div class="mb-6">
+                                <span class="inline-block bg-pink-100 text-pink-800 px-3 py-1 rounded-full" id="modalProductCategory"></span>
+                            </div>
+                            <div class="flex items-center mb-6">
+                                <button id="decreaseQty" class="bg-gray-200 text-gray-700 w-10 h-10 rounded-l-lg">-</button>
+                                <input type="number" id="productQty" value="1" min="1" class="w-16 h-10 text-center border-t border-b border-gray-300">
+                                <button id="increaseQty" class="bg-gray-200 text-gray-700 w-10 h-10 rounded-r-lg">+</button>
+                            </div>
+                            <button id="addToBagBtn" class="w-full bg-pink-600 text-white py-3 rounded-lg font-semibold hover:bg-pink-700">
+                                Add to Bag
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div id="cart-modal" class="modal">
-        <div class="bg-white p-8 rounded-2xl w-full max-w-md mx-4">
-            <h2 class="text-2xl font-bold mb-4">Your Bag</h2>
-            <div id="cart-items" class="space-y-4 max-h-60 overflow-y-auto mb-4"></div>
-            <div class="border-t pt-4">
-                <div class="flex justify-between font-bold text-xl mb-4">
-                    <span>Total:</span> <span id="cart-total">$0</span>
+    <!-- Shopping Bag Modal -->
+    <div id="bagModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50">
+        <div class="absolute right-0 top-0 h-full w-full md:w-96 bg-white shadow-xl">
+            <div class="p-6 h-full flex flex-col">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800">Shopping Bag</h3>
+                    <button id="closeBag" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
                 </div>
-                <button onclick="placeOrder()" class="w-full bg-green-500 text-white py-4 rounded-xl font-bold text-lg">Confirm Order</button>
+                
+                <div id="bagItems" class="flex-1 overflow-y-auto">
+                    <!-- Bag items will be loaded here -->
+                </div>
+                
+                <div class="border-t pt-4">
+                    <div class="flex justify-between text-lg font-semibold mb-4">
+                        <span>Total:</span>
+                        <span id="bagTotal">$0.00</span>
+                    </div>
+                    <button id="checkoutBtn" class="w-full bg-pink-600 text-white py-3 rounded-lg font-semibold hover:bg-pink-700">
+                        Proceed to Checkout
+                    </button>
+                </div>
             </div>
-            <button onclick="toggleModal('cart-modal')" class="w-full mt-4 text-gray-400">Close</button>
         </div>
     </div>
 
-    <script>
-        // Supabase Config
-        const SUPABASE_URL = 'https://ivvppceuqblhhbqnyfjp.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2dnBwY2V1cWJsaGhicW55ZmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTc3ODgsImV4cCI6MjA4Mzk5Mzc4OH0.iM48uGRMQjOVGKqqV7Z3mPGFH4BkWEnZS6T-Zw0dcPs';
-        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-        let cart = [];
-        let user = null;
-
-        function toggleModal(id) { document.getElementById(id).classList.toggle('active'); }
-
-        async function loadProducts(filter = null) {
-            let query = _supabase.from('products').select('*');
-            if(filter) query = query.eq('category', filter);
-            const { data } = await query;
-            
-            const grid = document.getElementById('product-grid');
-            grid.innerHTML = data.map(p => `
-                <div class="bg-white rounded-2xl shadow-sm border p-4 transition hover:shadow-lg">
-                    <img src="${p.image_url}" class="w-full h-48 object-cover rounded-xl">
-                    <h3 class="font-bold text-lg mt-4">${p.name}</h3>
-                    <p class="text-pink-600 font-bold">$${p.price}</p>
-                    <button onclick="addToCart(${p.id}, '${p.name}', ${p.price})" class="w-full mt-4 bg-gray-900 text-white py-2 rounded-lg text-sm">Add to Bag</button>
+    <!-- Order Form Modal -->
+    <div id="orderModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
+        <div class="container mx-auto p-4 min-h-screen flex items-center">
+            <div class="bg-white rounded-2xl w-full max-w-2xl mx-auto my-8">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-2xl font-bold text-gray-800">Delivery Details</h3>
+                        <button id="closeOrderModal" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+                    
+                    <form id="orderForm">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label class="block text-gray-700 mb-2">Full Name *</label>
+                                <input type="text" id="customerName" required 
+                                       class="w-full p-3 border border-gray-300 rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-2">Email *</label>
+                                <input type="email" id="customerEmail" required 
+                                       class="w-full p-3 border border-gray-300 rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-2">Phone Number *</label>
+                                <input type="tel" id="customerPhone" required 
+                                       class="w-full p-3 border border-gray-300 rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 mb-2">Delivery Date *</label>
+                                <input type="date" id="deliveryDate" required 
+                                       class="w-full p-3 border border-gray-300 rounded-lg">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label class="block text-gray-700 mb-2">Delivery Address *</label>
+                            <textarea id="deliveryAddress" rows="3" required 
+                                      class="w-full p-3 border border-gray-300 rounded-lg"></textarea>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label class="block text-gray-700 mb-2">Special Instructions</label>
+                            <textarea id="orderNotes" rows="2" 
+                                      class="w-full p-3 border border-gray-300 rounded-lg" 
+                                      placeholder="Any special requests or allergies..."></textarea>
+                        </div>
+                        
+                        <div class="bg-pink-50 p-4 rounded-lg mb-6">
+                            <h4 class="font-semibold mb-2">Order Summary</h4>
+                            <div id="orderSummary"></div>
+                            <div class="flex justify-between font-bold text-lg mt-2">
+                                <span>Total:</span>
+                                <span id="orderTotal">$0.00</span>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-pink-600 text-white py-3 rounded-lg font-semibold hover:bg-pink-700">
+                            Place Order
+                        </button>
+                    </form>
                 </div>
-            `).join('');
-        }
+            </div>
+        </div>
+    </div>
 
-        function addToCart(id, name, price) {
-            cart.push({id, name, price});
-            updateCartUI();
-        }
+    <!-- Auth Modal -->
+    <div id="authModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50">
+        <div class="container mx-auto p-4 min-h-screen flex items-center">
+            <div class="bg-white rounded-2xl w-full max-w-md mx-auto">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-2xl font-bold text-gray-800" id="authTitle">Login</h3>
+                        <button id="closeAuthModal" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times text-2xl"></i>
+                        </button>
+                    </div>
+                    
+                    <div id="loginForm">
+                        <div class="mb-4">
+                            <label class="block text-gray-700 mb-2">Email</label>
+                            <input type="email" id="loginEmail" 
+                                   class="w-full p-3 border border-gray-300 rounded-lg">
+                        </div>
+                        <div class="mb-6">
+                            <label class="block text-gray-700 mb-2">Password</label>
+                            <input type="password" id="loginPassword" 
+                                   class="w-full p-3 border border-gray-300 rounded-lg">
+                        </div>
+                        <button id="loginSubmit" class="w-full bg-pink-600 text-white py-3 rounded-lg font-semibold hover:bg-pink-700 mb-4">
+                            Login
+                        </button>
+                        <p class="text-center text-gray-600">
+                            Don't have an account? 
+                            <button id="switchToRegister" class="text-pink-600 hover:text-pink-700 font-semibold">
+                                Register here
+                            </button>
+                        </p>
+                    </div>
+                    
+                    <div id="registerForm" class="hidden">
+                        <div class="mb-4">
+                            <label class="block text-gray-700 mb-2">Full Name</label>
+                            <input type="text" id="registerName" 
+                                   class="w-full p-3 border border-gray-300 rounded-lg">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-gray-700 mb-2">Email</label>
+                            <input type="email" id="registerEmail" 
+                                   class="w-full p-3 border border-gray-300 rounded-lg">
+                        </div>
+                        <div class="mb-6">
+                            <label class="block text-gray-700 mb-2">Password</label>
+                            <input type="password" id="registerPassword" 
+                                   class="w-full p-3 border border-gray-300 rounded-lg">
+                        </div>
+                        <button id="registerSubmit" class="w-full bg-pink-600 text-white py-3 rounded-lg font-semibold hover:bg-pink-700 mb-4">
+                            Register
+                        </button>
+                        <p class="text-center text-gray-600">
+                            Already have an account? 
+                            <button id="switchToLogin" class="text-pink-600 hover:text-pink-700 font-semibold">
+                                Login here
+                            </button>
+                        </p>
+                    </div>
+                    
+                    <div id="authMessage" class="mt-4 text-center hidden"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        function updateCartUI() {
-            document.getElementById('cart-count').innerText = cart.length;
-            const itemsDiv = document.getElementById('cart-items');
-            const total = cart.reduce((sum, item) => sum + item.price, 0);
-            itemsDiv.innerHTML = cart.map(item => `<div class="flex justify-between"><span>${item.name}</span><b>$${item.price}</b></div>`).join('');
-            document.getElementById('cart-total').innerText = `$${total}`;
-        }
-
-        async function handleLogin() {
-            // Simplified Login for Demo
-            user = { email: document.getElementById('email').value };
-            document.getElementById('user-btn').innerText = "Account";
-            toggleModal('login-modal');
-        }
-
-        async function placeOrder() {
-            if(!user) return toggleModal('login-modal');
-            const { error } = await _supabase.from('orders').insert([{
-                customer_name: user.email,
-                items: cart,
-                total: cart.reduce((sum, i) => sum + i.price, 0),
-                status: 'Baking'
-            }]);
-            
-            if(!error) {
-                alert("Order Placed! Your Recipe PDF is downloading...");
-                window.location.href = "recipe.pdf"; // Place this file in your GitHub repo
-                cart = [];
-                updateCartUI();
-                toggleModal('cart-modal');
-            }
-        }
-
-        loadProducts();
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
