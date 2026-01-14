@@ -1,12 +1,15 @@
-// Supabase Configuration (Same as main app)
-const SUPABASE_URL = 'https://ivvppceuqblhhbqnyfjp.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2dnBwY2V1cWJsaGhicW55ZmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTc3ODgsImV4cCI6MjA4Mzk5Mzc4OH0.iM48uGRMQjOVGKqqV7Z3mPGFH4BkWEnZS6T-Zw0dcPs';
+// Supabase Configuration - REPLACE WITH YOUR ACTUAL CREDENTIALS
 
+const SUPABASE_URL = 'https://ivvppceuqblhhbqnyfjp.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2dnBwY2V1cWJsaGhicW55ZmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTc3ODgsImV4cCI6MjA4Mzk5Mzc4OH0.iM48uGRMQjOVGKqqV7Z3mPGFH4BkWEnZS6T-Zw0dcPs
+
+// Initialize Supabase client
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// State
+// State Management
 let currentAdmin = null;
 let currentOrderToUpdate = null;
+let currentProductToEdit = null;
 let ordersChart = null;
 
 // DOM Elements
@@ -58,10 +61,22 @@ const adminElements = {
     logoutBtn: document.getElementById('logoutBtn')
 };
 
-// Initialize
+// Initialize Admin Dashboard
 document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        await initializeAdminDashboard();
+    } catch (error) {
+        console.error('Error initializing admin dashboard:', error);
+        showNotification('Error loading admin dashboard. Please refresh the page.', 'error');
+    }
+});
+
+async function initializeAdminDashboard() {
+    // Check authentication first
     await checkAdminAuth();
-    initAdminEventListeners();
+    
+    // If not authenticated, this function will redirect, so we won't reach here
+    setupAdminEventListeners();
     await loadDashboardData();
     await loadAllOrders();
     await loadAllProducts();
@@ -69,63 +84,95 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Set up real-time subscriptions
     setupRealtimeSubscriptions();
-});
-
-// Authentication
-async function checkAdminAuth() {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
-        window.location.href = '../index.html';
-        return;
-    }
-    
-    currentAdmin = session.user;
-    
-    // Check if user is admin
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', currentAdmin.id)
-        .single();
-    
-    if (!profile?.is_admin) {
-        window.location.href = '../index.html';
-        return;
-    }
-    
-    adminElements.adminEmail.textContent = currentAdmin.email;
 }
 
-// Event Listeners
-function initAdminEventListeners() {
+// Authentication Functions
+async function checkAdminAuth() {
+    try {
+        // Check for existing session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+            console.error('Session error:', sessionError);
+            redirectToLogin();
+            return;
+        }
+        
+        if (!session) {
+            redirectToLogin();
+            return;
+        }
+        
+        currentAdmin = session.user;
+        
+        // Verify admin status
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('is_admin, is_banned')
+            .eq('id', currentAdmin.id)
+            .single();
+        
+        if (profileError || !profile) {
+            console.error('Profile fetch error:', profileError);
+            redirectToLogin();
+            return;
+        }
+        
+        if (profile.is_banned) {
+            await supabase.auth.signOut();
+            alert('Your admin account has been suspended.');
+            redirectToLogin();
+            return;
+        }
+        
+        if (!profile.is_admin) {
+            alert('Access denied. Admin privileges required.');
+            window.location.href = 'index.html';
+            return;
+        }
+        
+        // Update UI with admin info
+        adminElements.adminEmail.textContent = currentAdmin.email;
+        
+    } catch (error) {
+        console.error('Auth check error:', error);
+        redirectToLogin();
+    }
+}
+
+function redirectToLogin() {
+    // Redirect to main page for login
+    window.location.href = 'index.html';
+}
+
+// Event Listeners Setup
+function setupAdminEventListeners() {
     // Tab switching
     adminElements.tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
             const tab = btn.dataset.tab;
             switchTab(tab);
         });
     });
     
     // Logout
-    adminElements.logoutBtn.addEventListener('click', async () => {
-        await supabase.auth.signOut();
-        window.location.href = '../index.html';
-    });
+    adminElements.logoutBtn.addEventListener('click', handleLogout);
     
     // Product form
-    adminElements.productForm.addEventListener('submit', saveProduct);
+    adminElements.productForm.addEventListener('submit', handleProductSave);
     adminElements.cancelEdit.addEventListener('click', cancelProductEdit);
     
     // Status modal
     adminElements.cancelStatus.addEventListener('click', () => {
         adminElements.statusModal.classList.add('hidden');
+        currentOrderToUpdate = null;
     });
     
     adminElements.saveStatus.addEventListener('click', updateOrderStatus);
 }
 
-// Tab switching
+// Tab Management
 function switchTab(tab) {
     // Update active tab button
     adminElements.tabBtns.forEach(btn => {
@@ -155,51 +202,77 @@ function switchTab(tab) {
     adminElements.pageTitle.textContent = titles[tab];
 }
 
-// Dashboard
+// Dashboard Functions
 async function loadDashboardData() {
-    // Load revenue and orders count
-    const { data: orders } = await supabase
-        .from('orders')
-        .select('total_amount, status');
-    
-    const totalRevenue = orders?.reduce((sum, order) => sum + parseFloat(order.total_amount), 0) || 0;
-    adminElements.totalRevenue.textContent = `$${totalRevenue.toFixed(2)}`;
-    adminElements.totalOrders.textContent = orders?.length || 0;
-    
-    // Load users count
-    const { data: users } = await supabase
-        .from('profiles')
-        .select('id');
-    adminElements.totalUsers.textContent = users?.length || 0;
-    
-    // Load recent orders
-    await loadRecentOrders();
-    
-    // Load chart data
-    await loadChartData();
-    
-    // Load top products
-    await loadTopProducts();
+    try {
+        // Load total revenue and orders count
+        const { data: orders, error: ordersError } = await supabase
+            .from('orders')
+            .select('total_amount, status, items');
+        
+        if (ordersError) throw ordersError;
+        
+        const totalRevenue = orders?.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0) || 0;
+        adminElements.totalRevenue.textContent = `$${totalRevenue.toFixed(2)}`;
+        adminElements.totalOrders.textContent = orders?.length || 0;
+        
+        // Load users count
+        const { data: users, error: usersError } = await supabase
+            .from('profiles')
+            .select('id');
+        
+        if (usersError) throw usersError;
+        adminElements.totalUsers.textContent = users?.length || 0;
+        
+        // Load recent orders
+        await loadRecentOrders();
+        
+        // Load chart data
+        await loadChartData();
+        
+        // Load top products
+        await loadTopProducts(orders || []);
+        
+    } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        showNotification('Error loading dashboard data', 'error');
+    }
 }
 
 async function loadRecentOrders() {
-    const { data: orders } = await supabase
-        .from('orders')
-        .select(`
-            *,
-            profiles(full_name)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(5);
-    
+    try {
+        const { data: orders, error } = await supabase
+            .from('orders')
+            .select(`
+                *,
+                profiles(full_name, email)
+            `)
+            .order('created_at', { ascending: false })
+            .limit(5);
+        
+        if (error) throw error;
+        
+        renderRecentOrders(orders || []);
+    } catch (error) {
+        console.error('Error loading recent orders:', error);
+        adminElements.recentOrders.innerHTML = '<p class="text-red-500 text-center py-4">Error loading orders</p>';
+    }
+}
+
+function renderRecentOrders(orders) {
     if (!orders || orders.length === 0) {
-        adminElements.recentOrders.innerHTML = '<p class="text-gray-500 text-center py-4">No recent orders</p>';
+        adminElements.recentOrders.innerHTML = `
+            <div class="text-center py-8">
+                <i class="fas fa-shopping-bag text-4xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500">No recent orders</p>
+            </div>
+        `;
         return;
     }
     
-    let html = '<div class="space-y-3">';
+    let html = '<div class="space-y-4">';
     orders.forEach(order => {
-        const customerName = order.profiles?.full_name || order.customer_name;
+        const customerName = order.profiles?.full_name || order.customer_name || 'Unknown';
         const statusColors = {
             pending: 'bg-yellow-100 text-yellow-800',
             confirmed: 'bg-blue-100 text-blue-800',
@@ -209,16 +282,18 @@ async function loadRecentOrders() {
             cancelled: 'bg-red-100 text-red-800'
         };
         
+        const statusClass = statusColors[order.status] || 'bg-gray-100 text-gray-800';
+        
         html += `
-            <div class="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                    <div class="font-semibold">${customerName}</div>
+            <div class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition duration-200">
+                <div class="flex-1">
+                    <div class="font-semibold text-gray-800">${customerName}</div>
                     <div class="text-sm text-gray-500">Order #${order.id.substring(0, 8)}</div>
                 </div>
                 <div class="text-right">
-                    <div class="font-semibold">$${order.total_amount}</div>
-                    <span class="text-xs px-2 py-1 rounded-full ${statusColors[order.status] || 'bg-gray-100 text-gray-800'}">
-                        ${order.status}
+                    <div class="font-semibold text-gray-800">$${order.total_amount || 0}</div>
+                    <span class="inline-block px-3 py-1 rounded-full text-xs font-medium ${statusClass}">
+                        ${order.status || 'pending'}
                     </span>
                 </div>
             </div>
@@ -229,93 +304,145 @@ async function loadRecentOrders() {
 }
 
 async function loadChartData() {
-    const { data: orders } = await supabase
-        .from('orders')
-        .select('status');
-    
-    const statusCounts = {
-        pending: 0,
-        confirmed: 0,
-        baking: 0,
-        shipped: 0,
-        delivered: 0,
-        cancelled: 0
-    };
-    
-    orders?.forEach(order => {
-        if (statusCounts[order.status] !== undefined) {
-            statusCounts[order.status]++;
-        }
-    });
-    
-    const ctx = document.getElementById('ordersChart').getContext('2d');
-    
-    if (ordersChart) {
-        ordersChart.destroy();
-    }
-    
-    ordersChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: Object.keys(statusCounts).map(s => s.charAt(0).toUpperCase() + s.slice(1)),
-            datasets: [{
-                data: Object.values(statusCounts),
-                backgroundColor: [
-                    '#fbbf24', // pending - yellow
-                    '#60a5fa', // confirmed - blue
-                    '#a78bfa', // baking - purple
-                    '#818cf8', // shipped - indigo
-                    '#34d399', // delivered - green
-                    '#f87171'  // cancelled - red
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
+    try {
+        const { data: orders, error } = await supabase
+            .from('orders')
+            .select('status');
+        
+        if (error) throw error;
+        
+        const statusCounts = {
+            pending: 0,
+            confirmed: 0,
+            baking: 0,
+            shipped: 0,
+            delivered: 0,
+            cancelled: 0
+        };
+        
+        orders?.forEach(order => {
+            if (statusCounts[order.status] !== undefined) {
+                statusCounts[order.status]++;
             }
+        });
+        
+        const ctx = document.getElementById('ordersChart').getContext('2d');
+        
+        if (ordersChart) {
+            ordersChart.destroy();
         }
-    });
+        
+        ordersChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(statusCounts).map(s => s.charAt(0).toUpperCase() + s.slice(1)),
+                datasets: [{
+                    data: Object.values(statusCounts),
+                    backgroundColor: [
+                        '#fbbf24', // pending - yellow
+                        '#60a5fa', // confirmed - blue
+                        '#a78bfa', // baking - purple
+                        '#818cf8', // shipped - indigo
+                        '#34d399', // delivered - green
+                        '#f87171'  // cancelled - red
+                    ],
+                    borderWidth: 0,
+                    hoverOffset: 15
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                },
+                cutout: '65%'
+            }
+        });
+    } catch (error) {
+        console.error('Error loading chart data:', error);
+    }
 }
 
-async function loadTopProducts() {
-    const { data: orders } = await supabase
-        .from('orders')
-        .select('items');
-    
-    const productCounts = {};
-    
-    orders?.forEach(order => {
-        if (order.items && Array.isArray(order.items)) {
-            order.items.forEach(item => {
-                if (!productCounts[item.name]) {
-                    productCounts[item.name] = 0;
-                }
-                productCounts[item.name] += item.quantity;
-            });
-        }
-    });
-    
-    // Sort by count and take top 5
-    const topProducts = Object.entries(productCounts)
-        .sort(([,a], [,b]) => b - a)
-        .slice(0, 5);
-    
-    if (topProducts.length === 0) {
-        adminElements.topProducts.innerHTML = '<p class="text-gray-500 text-center py-4">No product data available</p>';
+async function loadTopProducts(orders) {
+    try {
+        const productCounts = {};
+        
+        orders.forEach(order => {
+            if (order.items && Array.isArray(order.items)) {
+                order.items.forEach(item => {
+                    if (!productCounts[item.name]) {
+                        productCounts[item.name] = {
+                            name: item.name,
+                            count: 0,
+                            revenue: 0
+                        };
+                    }
+                    productCounts[item.name].count += item.quantity || 0;
+                    productCounts[item.name].revenue += (item.price || 0) * (item.quantity || 0);
+                });
+            }
+        });
+        
+        // Sort by count and take top 5
+        const topProducts = Object.values(productCounts)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+        
+        renderTopProducts(topProducts);
+    } catch (error) {
+        console.error('Error loading top products:', error);
+    }
+}
+
+function renderTopProducts(products) {
+    if (!products || products.length === 0) {
+        adminElements.topProducts.innerHTML = `
+            <div class="text-center py-8">
+                <i class="fas fa-birthday-cake text-4xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500">No product data available</p>
+            </div>
+        `;
         return;
     }
     
     let html = '<div class="space-y-3">';
-    topProducts.forEach(([name, count]) => {
+    products.forEach((product, index) => {
+        const rankColors = ['bg-yellow-500', 'bg-gray-400', 'bg-yellow-700'];
+        const rankColor = index < 3 ? rankColors[index] : 'bg-gray-300';
+        
         html += `
-            <div class="flex items-center justify-between p-3 border rounded-lg">
-                <div class="font-medium">${name}</div>
-                <div class="text-pink-600 font-semibold">${count} sold</div>
+            <div class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition duration-200">
+                <div class="flex items-center">
+                    <span class="inline-flex items-center justify-center w-8 h-8 rounded-full ${rankColor} text-white text-sm font-bold mr-3">
+                        ${index + 1}
+                    </span>
+                    <div>
+                        <div class="font-medium text-gray-800">${product.name}</div>
+                        <div class="text-sm text-gray-500">$${product.revenue.toFixed(2)} revenue</div>
+                    </div>
+                </div>
+                <div class="text-pink-600 font-semibold">${product.count} sold</div>
             </div>
         `;
     });
@@ -325,25 +452,41 @@ async function loadTopProducts() {
 
 // Order Management
 async function loadAllOrders() {
-    const { data: orders, error } = await supabase
-        .from('orders')
-        .select(`
-            *,
-            profiles(full_name, email)
-        `)
-        .order('created_at', { ascending: false });
-    
-    if (error) {
+    try {
+        const { data: orders, error } = await supabase
+            .from('orders')
+            .select(`
+                *,
+                profiles(full_name, email)
+            `)
+            .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        renderOrdersTable(orders || []);
+    } catch (error) {
         console.error('Error loading orders:', error);
-        return;
-    }
-    
-    adminElements.ordersTable.innerHTML = '';
-    
-    if (!orders || orders.length === 0) {
         adminElements.ordersTable.innerHTML = `
             <tr>
-                <td colspan="7" class="p-8 text-center text-gray-500">No orders found</td>
+                <td colspan="7" class="p-8 text-center text-red-500">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    Error loading orders
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function renderOrdersTable(orders) {
+    adminElements.ordersTable.innerHTML = '';
+    
+    if (orders.length === 0) {
+        adminElements.ordersTable.innerHTML = `
+            <tr>
+                <td colspan="7" class="p-8 text-center text-gray-500">
+                    <i class="fas fa-shopping-bag text-3xl text-gray-300 mb-2 block"></i>
+                    No orders found
+                </td>
             </tr>
         `;
         return;
@@ -351,10 +494,10 @@ async function loadAllOrders() {
     
     orders.forEach(order => {
         const row = document.createElement('tr');
-        row.className = 'border-b hover:bg-gray-50';
+        row.className = 'border-b hover:bg-gray-50 transition duration-200';
         
-        const customerName = order.profiles?.full_name || order.customer_name;
-        const customerEmail = order.profiles?.email || order.customer_email;
+        const customerName = order.profiles?.full_name || order.customer_name || 'Unknown';
+        const customerEmail = order.profiles?.email || order.customer_email || '';
         const itemsCount = order.items?.length || 0;
         
         const statusColors = {
@@ -366,31 +509,45 @@ async function loadAllOrders() {
             cancelled: 'bg-red-100 text-red-800'
         };
         
+        const statusClass = statusColors[order.status] || 'bg-gray-100 text-gray-800';
+        
         row.innerHTML = `
             <td class="p-4">
-                <div class="font-mono text-sm">${order.id.substring(0, 8)}...</div>
+                <div class="font-mono text-sm text-gray-600" title="${order.id}">
+                    ${order.id.substring(0, 8)}...
+                </div>
             </td>
             <td class="p-4">
-                <div class="font-medium">${customerName}</div>
-                <div class="text-sm text-gray-500">${customerEmail}</div>
+                <div class="font-medium text-gray-800">${customerName}</div>
+                <div class="text-sm text-gray-500 truncate max-w-xs">${customerEmail}</div>
             </td>
-            <td class="p-4">${itemsCount} item(s)</td>
-            <td class="p-4 font-semibold">$${order.total_amount}</td>
             <td class="p-4">
-                <span class="px-3 py-1 rounded-full text-sm ${statusColors[order.status] || 'bg-gray-100 text-gray-800'}">
-                    ${order.status}
+                <span class="inline-flex items-center justify-center w-6 h-6 bg-pink-100 text-pink-800 rounded-full text-xs font-medium">
+                    ${itemsCount}
                 </span>
             </td>
-            <td class="p-4 text-sm">${new Date(order.created_at).toLocaleDateString()}</td>
+            <td class="p-4 font-semibold text-gray-800">$${order.total_amount || 0}</td>
+            <td class="p-4">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusClass}">
+                    <i class="fas fa-circle mr-2 text-xs"></i>
+                    ${order.status || 'pending'}
+                </span>
+            </td>
+            <td class="p-4 text-sm text-gray-600">
+                ${new Date(order.created_at).toLocaleDateString()}
+                <div class="text-xs text-gray-400">${new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+            </td>
             <td class="p-4">
                 <div class="flex space-x-2">
-                    <button class="update-status-btn bg-pink-100 text-pink-700 px-3 py-1 rounded text-sm hover:bg-pink-200"
+                    <button class="update-status-btn bg-pink-600 hover:bg-pink-700 text-white px-3 py-1 rounded text-sm font-medium transition duration-300 flex items-center"
                             data-id="${order.id}"
                             data-status="${order.status}">
+                        <i class="fas fa-edit mr-1"></i>
                         Update
                     </button>
-                    <button class="view-order-btn bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-200"
+                    <button class="view-order-btn bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded text-sm font-medium transition duration-300 flex items-center"
                             data-id="${order.id}">
+                        <i class="fas fa-eye mr-1"></i>
                         View
                     </button>
                 </div>
@@ -402,173 +559,4 @@ async function loadAllOrders() {
     
     // Add event listeners
     document.querySelectorAll('.update-status-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const orderId = e.target.dataset.id;
-            const currentStatus = e.target.dataset.status;
-            showStatusModal(orderId, currentStatus);
-        });
-    });
-    
-    document.querySelectorAll('.view-order-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const orderId = e.target.dataset.id;
-            viewOrderDetails(orderId);
-        });
-    });
-}
-
-function showStatusModal(orderId, currentStatus) {
-    currentOrderToUpdate = orderId;
-    adminElements.newStatus.value = currentStatus;
-    adminElements.statusModal.classList.remove('hidden');
-}
-
-async function updateOrderStatus() {
-    if (!currentOrderToUpdate) return;
-    
-    const newStatus = adminElements.newStatus.value;
-    
-    const { error } = await supabase
-        .from('orders')
-        .update({ status: newStatus })
-        .eq('id', currentOrderToUpdate);
-    
-    if (error) {
-        console.error('Error updating order status:', error);
-        alert('Error updating order status');
-        return;
-    }
-    
-    adminElements.statusModal.classList.add('hidden');
-    await loadAllOrders();
-    await loadDashboardData();
-}
-
-async function viewOrderDetails(orderId) {
-    const { data: order } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('id', orderId)
-        .single();
-    
-    if (!order) return;
-    
-    let itemsHTML = '';
-    if (order.items && Array.isArray(order.items)) {
-        itemsHTML = order.items.map(item => 
-            `<li>${item.name} × ${item.quantity} - $${(item.price * item.quantity).toFixed(2)}</li>`
-        ).join('');
-    }
-    
-    const modalHTML = `
-        <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-            <div class="bg-white rounded-xl w-full max-w-2xl mx-4">
-                <div class="p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-xl font-bold">Order Details</h3>
-                        <button onclick="this.parentElement.parentElement.parentElement.remove()" 
-                                class="text-gray-500 hover:text-gray-700">
-                            <i class="fas fa-times text-2xl"></i>
-                        </button>
-                    </div>
-                    <div class="space-y-4">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="text-gray-500 text-sm">Order ID</label>
-                                <p class="font-mono">${order.id}</p>
-                            </div>
-                            <div>
-                                <label class="text-gray-500 text-sm">Date</label>
-                                <p>${new Date(order.created_at).toLocaleString()}</p>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="text-gray-500 text-sm">Customer</label>
-                            <p>${order.customer_name} (${order.customer_email})</p>
-                            <p class="text-sm">Phone: ${order.customer_phone}</p>
-                        </div>
-                        <div>
-                            <label class="text-gray-500 text-sm">Delivery Address</label>
-                            <p>${order.delivery_address}</p>
-                        </div>
-                        <div>
-                            <label class="text-gray-500 text-sm">Items</label>
-                            <ul class="list-disc pl-5">${itemsHTML}</ul>
-                        </div>
-                        <div>
-                            <label class="text-gray-500 text-sm">Total Amount</label>
-                            <p class="text-xl font-bold">$${order.total_amount}</p>
-                        </div>
-                        ${order.notes ? `
-                        <div>
-                            <label class="text-gray-500 text-sm">Notes</label>
-                            <p>${order.notes}</p>
-                        </div>` : ''}
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-}
-
-// Product Management
-async function loadAllProducts() {
-    const { data: products, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false });
-    
-    if (error) {
-        console.error('Error loading products:', error);
-        return;
-    }
-    
-    adminElements.productsTable.innerHTML = '';
-    
-    if (!products || products.length === 0) {
-        adminElements.productsTable.innerHTML = `
-            <tr>
-                <td colspan="5" class="p-8 text-center text-gray-500">No products found</td>
-            </tr>
-        `;
-        return;
-    }
-    
-    products.forEach(product => {
-        const row = document.createElement('tr');
-        row.className = 'border-b hover:bg-gray-50';
-        
-        row.innerHTML = `
-            <td class="p-4">
-                <div class="flex items-center">
-                    <img src="${product.image_url || 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80'}" 
-                         alt="${product.name}" 
-                         class="w-12 h-12 object-cover rounded mr-3">
-                    <div>
-                        <div class="font-medium">${product.name}</div>
-                        <div class="text-sm text-gray-500 truncate max-w-xs">${product.description || 'No description'}</div>
-                    </div>
-                </div>
-            </td>
-            <td class="p-4">
-                <span class="px-3 py-1 bg-pink-100 text-pink-800 rounded-full text-sm">
-                    ${product.category}
-                </span>
-            </td>
-            <td class="p-4 font-semibold">$${product.price}</td>
-            <td class="p-4">
-                <span class="px-3 py-1 rounded-full text-sm ${product.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                    ${product.is_active ? 'Active' : 'Inactive'}
-                </span>
-            </td>
-            <td class="p-4">
-                <div class="flex space-x-2">
-                    <button class="edit-product-btn bg-blue-100 text-blue-700 px-3 py-1 rounded text-sm hover:bg-blue-200"
-                            data-id="${product.id}">
-                        Edit
-                    </button>
-                    <button class="delete-product-btn bg-red-100 text-red-700 px-3 py-1 rounded text-sm hover:bg-red-200"
-                            data-id="${product.id}"
-                            data-name="${pro
+        btn.addEventListener('click', (e) 
