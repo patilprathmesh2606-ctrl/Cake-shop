@@ -1,5 +1,40 @@
 // app.js
 
+// Initialize Supabase (Add this at the top of app.js)
+const _supabase = supabase.createClient('https://ivvppceuqblhhbqnyfjp.supabase.co', 'sb_secret__bhddGHca3_uHOlmN8Nrjg_x0r43TBj');
+
+// Function to place an order in the Database
+async function placeOrder() {
+    const { data, error } = await _supabase
+        .from('orders')
+        .insert([
+            { 
+                customer_name: currentUser.name, 
+                items: JSON.stringify(bag), 
+                total_price: calculateTotal(),
+                status: 'Baking' 
+            }
+        ]);
+
+    if (!error) {
+        alert("Order Placed! Redirecting to Recipe PDF...");
+        window.open('assets/cake-recipe.pdf', '_blank');
+        showOrderTracking();
+    }
+}
+
+// Function for User to track status
+async function trackOrderStatus(orderId) {
+    let { data: order, error } = await _supabase
+        .from('orders')
+        .select('status')
+        .eq('id', orderId)
+        .single();
+    
+    document.getElementById('status-display').innerText = `Current Status: ${order.status}`;
+}
+    
+
 // 1. Demo Data
 const products = [
     { id: 1, name: "Dark Forest", price: 35, category: "Birthday", img: "https://placehold.co/400x400?text=Dark+Forest" },
