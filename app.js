@@ -105,5 +105,39 @@ function checkout() {
     window.location.href = "assets/recipe-guide.pdf";
 }
 
+// Fetch all orders for the Shop Owner
+async function loadShopOrders() {
+    let { data: orders } = await _supabase.from('orders').select('*');
+    
+    const container = document.getElementById('admin-order-list');
+    orders.forEach(order => {
+        container.innerHTML += `
+            <div class="p-4 border-b flex justify-between items-center">
+                <div>
+                    <p class="font-bold">Order #${order.id} - ${order.customer_name}</p>
+                    <p class="text-sm">Status: <span class="text-blue-500">${order.status}</span></p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="updateStatus(${order.id}, 'Out for Delivery')" class="bg-blue-500 text-white px-3 py-1 rounded">Ship</button>
+                    <button onclick="updateStatus(${order.id}, 'Cancelled')" class="bg-red-500 text-white px-3 py-1 rounded">Cancel</button>
+                </div>
+            </div>
+        `;
+    });
+}
+
+// Update Status Logic
+async function updateStatus(orderId, newStatus) {
+    await _supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId);
+    
+    alert("Status Updated and Customer Notified!");
+    location.reload();
+    }
+    
+        
+
 // Initialize
 renderProducts();
