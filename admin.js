@@ -87,57 +87,85 @@ async function initializeAdminDashboard() {
 }
 
 // Authentication Functions
-async function checkAdminAuth() {
+
+        async function checkAdminAuth() {
     try {
-        // Check for existing session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
             console.error('Session error:', sessionError);
-            redirectToLogin();
-            return;
+            window.location.href = 'index.html';
+            return false;
         }
         
         if (!session) {
-            redirectToLogin();
-            return;
+            window.location.href = 'index.html';
+            return false;
         }
         
         currentAdmin = session.user;
         
-        // Verify admin status
+        // Get user profile and check admin status
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select('is_admin, is_banned')
+            .select('is_admin, is_banned, email')
             .eq('id', currentAdmin.id)
-            .single();
+            .maybeSingle();
         
-        if (profileError || !profile) {
-            console.error('Profile fetch error:', profileError);
-            redirectToLogin();
-            return;
+        if (profileError) {
+            console.error('Profile error:', profileError);
+            window.location.href = 'index.html';
+            return false;
         }
         
+        // If no profile found, redirect
+        if (!profile) {
+            window.location.href = 'index.html';
+            return false;
+        }
+        
+        // Check if banned
         if (profile.is_banned) {
             await supabase.auth.signOut();
-            alert('Your admin account has been suspended.');
-            redirectToLogin();
-            return;
+            alert('Your account has been suspended.');
+            window.location.href = 'index.html';
+            return false;
         }
         
+        // Check if admin
         if (!profile.is_admin) {
             alert('Access denied. Admin privileges required.');
             window.location.href = 'index.html';
-            return;
+            return false;
         }
         
         // Update UI with admin info
-        adminElements.adminEmail.textContent = currentAdmin.email;
+        adminElements.adminEmail.textContent = profile.email || currentAdmin.email;
+        
+        return true;
         
     } catch (error) {
         console.error('Auth check error:', error);
-        redirectToLogin();
+        window.location.href = 'index.html';
+        return false;
     }
+}
+
+// Update initializeAdminDashboard function:
+async function initializeAdminDashboard() {
+    const isAuthenticated = await checkAdminAuth();
+    
+    if (!isAuthenticated) {
+        return; // Function will redirect
+    }
+    
+    setupAdminEventListeners();
+    await loadDashboardData();
+    await loadAllOrders();
+    await loadAllProducts();
+    await loadAllUsers();
+    
+    setupRealtimeSubscriptions();
 }
 
 function redirectToLogin() {
