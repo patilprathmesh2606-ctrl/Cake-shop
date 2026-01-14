@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cake Shop Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 100; }
+        .active { display: flex; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <header class="bg-white p-4 shadow-sm flex justify-between items-center sticky top-0 z-50">
+        <h1 class="text-2xl font-bold text-pink-500">🍰 CakeShop</h1>
+        <div class="flex gap-4">
+            <button onclick="toggleBag()" class="relative font-semibold">
+                🛒 Bag (<span id="bag-count">0</span>)
+            </button>
+            <button id="auth-btn" onclick="openLogin()" class="bg-pink-500 text-white px-4 py-2 rounded-lg text-sm">Login</button>
+        </div>
+    </header>
+
+    <div class="p-4 flex gap-2 overflow-x-auto bg-white border-b">
+        <button onclick="filterCakes('All')" class="px-4 py-1 border rounded-full whitespace-nowrap">All</button>
+        <button onclick="filterCakes('Wedding')" class="px-4 py-1 border rounded-full whitespace-nowrap">Wedding</button>
+        <button onclick="filterCakes('Birthday')" class="px-4 py-1 border rounded-full whitespace-nowrap">Birthday</button>
+    </div>
+
+    <main id="product-list" class="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+        </main>
+
+    <div id="bag-modal" class="modal">
+        <div class="bg-white p-6 rounded-xl w-11/12 max-w-md">
+            <h2 class="text-xl font-bold mb-4">Your Bag</h2>
+            <div id="bag-items" class="mb-4"></div>
+            <hr class="mb-4">
+            <button onclick="checkout()" class="w-full bg-green-500 text-white py-3 rounded-lg font-bold">Order Now (Get Recipe PDF)</button>
+            <button onclick="toggleBag()" class="w-full mt-2 text-gray-500">Close</button>
+        </div>
+    </div>
+
+    <div id="login-modal" class="modal">
+        <div class="bg-white p-8 rounded-xl w-11/12 max-w-sm">
+            <h2 class="text-2xl font-bold mb-4">Login</h2>
+            <input type="email" id="email" placeholder="Email" class="w-full border p-2 mb-2 rounded">
+            <input type="password" id="pass" placeholder="Password" class="w-full border p-2 mb-4 rounded">
+            <button onclick="performLogin()" class="w-full bg-pink-500 text-white py-2 rounded mb-2">Login</button>
+            <p class="text-xs text-center">New here? <a href="#" class="text-blue-500">Register</a></p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
