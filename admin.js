@@ -1,6 +1,6 @@
-// ==============================================
+
 // Supabase Configuration - UPDATE THESE VALUES!
-// ==============================================
+
 
 const SUPABASE_URL = 'https://ivvppceuqblhhbqnyfjp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2dnBwY2V1cWJsaGhicW55ZmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTc3ODgsImV4cCI6MjA4Mzk5Mzc4OH0.iM48uGRMQjOVGKqqV7Z3mPGFH4BkWEnZS6T-Zw0dcPs
@@ -8,9 +8,9 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Initialize Supabase client
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ==============================================
+
 // State Management
-// ==============================================
+
 let currentAdmin = null;
 let currentOrderToUpdate = null;
 let currentProductToEdit = null;
@@ -19,9 +19,9 @@ let allOrders = [];
 let allProducts = [];
 let allUsers = [];
 
-// ==============================================
+
 // DOM Elements
-// ==============================================
+
 const adminElements = {
     // Tabs
     tabBtns: document.querySelectorAll('.tab-btn'),
@@ -70,9 +70,9 @@ const adminElements = {
     logoutBtn: document.getElementById('logoutBtn')
 };
 
-// ==============================================
+
 // Initialize Admin Dashboard
-// ==============================================
+
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Initializing Admin Dashboard...');
     
@@ -100,9 +100,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('Admin Dashboard initialized successfully');
 });
 
-// ==============================================
+
 // Custom Styles for Admin
-// ==============================================
+
 function addAdminStyles() {
     const style = document.createElement('style');
     style.textContent = `
@@ -200,9 +200,9 @@ function addAdminStyles() {
     document.head.appendChild(style);
 }
 
-// ==============================================
+
 // Authentication Functions
-// ==============================================
+
 async function checkAdminAuth() {
     console.log('Checking admin authentication...');
     
@@ -278,9 +278,9 @@ function redirectToLogin() {
     window.location.href = 'index.html';
 }
 
-// ==============================================
+
 // Event Listeners Setup
-// ==============================================
+
 function setupAdminEventListeners() {
     console.log('Setting up admin event listeners...');
     
@@ -341,9 +341,9 @@ function setupAdminEventListeners() {
     console.log('Admin event listeners setup complete');
 }
 
-// ==============================================
+
 // Tab Management
-// ==============================================
+
 function switchTab(tab) {
     console.log(`Switching to ${tab} tab`);
     
@@ -397,9 +397,9 @@ function switchTab(tab) {
     }
 }
 
-// ==============================================
+
 // Dashboard Functions
-// ==============================================
+
 async function loadDashboardData() {
     console.log('Loading dashboard data...');
     
