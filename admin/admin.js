@@ -7,7 +7,7 @@
 const { supabase } = require('./supabaseConfig.js'); // Adjust path if necessary
 
 // Initialize Supabase client
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+//const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 
 // State Management
