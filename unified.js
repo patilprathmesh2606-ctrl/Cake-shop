@@ -1,12 +1,16 @@
 // ==============================================
 // Supabase Configuration - UPDATE THESE VALUES!
 // ==============================================
-const SUPABASE_URL = 'https://ivvppceuqblhhbqnyfjp.supabase.co'; // Replace with your actual URL
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2dnBwY2V1cWJsaGhicW55ZmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTc3ODgsImV4cCI6MjA4Mzk5Mzc4OH0.iM48uGRMQjOVGKqqV7Z3mPGFH4BkWEnZS6T-Zw0dcPs';
+const SUPABASE_URL = 'https://your-project.supabase.co'; // CHANGE THIS
+const SUPABASE_ANON_KEY = 'your-supabase-anon-key'; // CHANGE THIS
 
-
-// Initialize Supabase client
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Initialize Supabase client - Check if already exists
+let supabase;
+if (typeof window.supabase !== 'undefined' && window.supabase) {
+    supabase = window.supabase;
+} else {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
 
 // ==============================================
 // Global State Management
@@ -1149,7 +1153,7 @@ async function loadUserOrders() {
                 <i class="fas fa-exclamation-triangle text-3xl text-red-300 mb-4"></i>
                 <h3 class="text-lg font-semibold text-gray-600 mb-2">Error Loading Orders</h3>
                 <p class="text-gray-500">Could not load your orders. Please try again.</p>
-                <button onclick="window.loadUserOrders && window.loadUserOrders()" class="mt-4 bg-pink-600 text-white px-4 py-2 rounded-lg hover:bg-pink-700 transition duration-300">
+                <button onclick="loadUserOrders()" class="mt-4 bg-pink-600 text-white px-4 py-2 rounded-lg hover:bg-pink-700 transition duration-300">
                     <i class="fas fa-redo mr-2"></i>Retry
                 </button>
             </div>
@@ -2244,6 +2248,33 @@ async function editProduct(productId) {
         console.error('Error loading product for edit:', error);
         showNotification('Error loading product details', 'error');
     }
+}
+
+function cancelProductEdit() {
+    console.log('Canceling product edit');
+    
+    // Clear form
+    if (elements.productForm) {
+        elements.productForm.reset();
+    }
+    if (elements.productId) {
+        elements.productId.value = '';
+    }
+    
+    // Reset UI
+    if (elements.productFormTitle) {
+        elements.productFormTitle.textContent = 'Add New Product';
+    }
+    if (elements.saveProduct) {
+        elements.saveProduct.textContent = 'Save Product';
+    }
+    if (elements.cancelEdit) {
+        elements.cancelEdit.classList.add('hidden');
+    }
+    
+    currentProductToEdit = null;
+    
+    showNotification('Product edit cancelled', 'info');
 }
 
 async function handleAdminProductSave(e) {
