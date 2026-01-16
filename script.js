@@ -1,6 +1,3 @@
-// ==============================================
-// Supabase Configuration - UPDATE THESE VALUES!
-// ==============================================
 const SUPABASE_URL = 'https://ivvppceuqblhhbqnyfjp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2dnBwY2V1cWJsaGhicW55ZmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTc3ODgsImV4cCI6MjA4Mzk5Mzc4OH0.iM48uGRMQjOVGKqqV7Z3mPGFH4BkWEnZS6T-Zw0dcPs';
 
@@ -8,18 +5,15 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Initialize Supabase client
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ==============================================
-// State Management
-// ==============================================
 let currentUser = null;
 let shoppingBag = JSON.parse(localStorage.getItem('shoppingBag')) || [];
 let products = [];
 let currentProduct = null;
 let currentOrders = [];
 
-// ==============================================
+
 // DOM Elements
-// ==============================================
+
 const elements = {
     // Buttons
     bagBtn: document.getElementById('bagBtn'),
@@ -122,9 +116,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('Application initialized successfully');
 });
 
-// ==============================================
+
 // Custom Styles
-// ==============================================
+
 function addCustomStyles() {
     const style = document.createElement('style');
     style.textContent = `
@@ -219,9 +213,9 @@ function addCustomStyles() {
     document.head.appendChild(style);
 }
 
-// ==============================================
+
 // Event Listeners Setup
-// ==============================================
+
 function setupEventListeners() {
     console.log('Setting up event listeners...');
     
@@ -382,9 +376,9 @@ function setupEventListeners() {
     console.log('Event listeners setup complete');
 }
 
-// ==============================================
+
 // Authentication Functions
-// ==============================================
+
 async function checkAuthStatus() {
     console.log('Checking authentication status...');
     try {
@@ -700,9 +694,9 @@ async function handleLogout() {
     }
 }
 
-// ==============================================
+
 // Product Functions
-// ==============================================
+
 async function loadProducts() {
     console.log('Loading products...');
     
@@ -928,9 +922,9 @@ function filterProducts() {
     renderProducts(filtered);
 }
 
-// ==============================================
+
 // Shopping Bag Functions
-// ==============================================
+
 function addToBag() {
     if (!currentProduct) {
         console.error('No current product selected');
@@ -1361,9 +1355,8 @@ function showOrderConfirmation(order) {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 }
 
-// ==============================================
 // Order Functions
-// ==============================================
+
 async function loadUserOrders() {
     console.log('Loading user orders...');
     
@@ -1605,9 +1598,9 @@ function showOrderItemsModal(order) {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 }
 
-// ==============================================
+
 // Real-time Subscriptions
-// ==============================================
+
 function setupRealtimeSubscriptions() {
     console.log('Setting up real-time subscriptions...');
     
@@ -1660,9 +1653,9 @@ function setupRealtimeSubscriptions() {
     };
 }
 
-// ==============================================
+
 // Utility Functions
-// ==============================================
+
 function showModal(modal) {
     if (!modal) return;
     
@@ -1743,9 +1736,9 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
-// ==============================================
+
 // Global Error Handling
-// ==============================================
+
 window.addEventListener('error', function(e) {
     console.error('Global error:', e.error);
     showNotification('An unexpected error occurred. Please refresh the page.', 'error');
@@ -1756,9 +1749,9 @@ window.addEventListener('unhandledrejection', function(e) {
     showNotification('An unexpected error occurred. Please try again.', 'error');
 });
 
-// ==============================================
+
 // Make functions available globally if needed
-// ==============================================
+
 window.refreshProducts = loadProducts;
 window.refreshOrders = loadUserOrders;
 window.updateCart = updateBagUI;
