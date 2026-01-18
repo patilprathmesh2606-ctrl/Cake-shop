@@ -1,18 +1,18 @@
 // ==============================================
 // Supabase Configuration - UPDATE THESE VALUES!
 // ==============================================
-//const SUPABASE_URL = 'https://ivvppceuqblhhbqnyfjp.supabase.co'; // Replace with your actual URL
-//const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2dnBwY2V1cWJsaGhicW55ZmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTc3ODgsImV4cCI6MjA4Mzk5Mzc4OH0.iM48uGRMQjOVGKqqV7Z3mPGFH4BkWEnZS6T-Zw0dcPs';
+const SUPABASE_URL = 'https://ivvppceuqblhhbqnyfjp.supabase.co'; // Replace with your actual URL
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2dnBwY2V1cWJsaGhicW55ZmpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTc3ODgsImV4cCI6MjA4Mzk5Mzc4OH0.iM48uGRMQjOVGKqqV7Z3mPGFH4BkWEnZS6T-Zw0dcPs';
 
 
 
 // Initialize Supabase client - Check if already exists
-//let supabase;
-//if (typeof window.supabase !== 'undefined' && window.supabase) {
- //   supabase = window.supabase;
-//} else {
- //   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-//}
+let supabase;
+if (typeof window.supabase !== 'undefined' && window.supabase) {
+   supabase = window.supabase;
+} else {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
 
 // ==============================================
 // Global State Management
